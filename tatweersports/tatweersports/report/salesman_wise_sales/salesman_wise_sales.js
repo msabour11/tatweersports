@@ -24,23 +24,23 @@ frappe.query_reports["Salesman Wise Sales"] = {
       //   default: frappe.defaults.get_user_default("Warehouse"),
       width: "200px",
     },
-    {
-      fieldname: "salesperson",
-      label: "salesperson",
-      fieldtype: "Link",
-      options: "Sales Person",
-      // default: frappe.defaults.get_user_default("sales_person"),
-      width: "200px",
-    }
+    // {
+    //   fieldname: "salesperson",
+    //   label: "salesperson",
+    //   fieldtype: "Link",
+    //   options: "Sales Person",
+    //   // default: frappe.defaults.get_user_default("sales_person"),
+    //   width: "200px",
+    // },
   ],
 };
-frappe.query_reports["Salesman Wise Sales"].onload = function (report) {
-  report.page.set_title(__("Salesman Wise Sales"));
-  report.page.set_secondary_action(
-    __("Download CSV"),
-    function () {
-      report.download_csv();
-    },
-    "octicon octicon-file-directory"
-  );
-};
+// frappe.query_reports["Salesman Wise Sales"].onload = function (report) {
+//   report.page.set_title(__("Salesman Wise Sales"));
+//   report.page.set_secondary_action(
+//     __("Download CSV"),
+//     function () {
+//       report.download_csv();
+//     },
+//     "octicon octicon-file-directory"
+//   );
+// };

@@ -601,16 +601,16 @@ def get_conditions(filters):
             "(SELECT warehouse FROM `tabPOS Profile` WHERE name = si.pos_profile) = %(set_warehouse)s"
         )
 
-    if filters.get("salesperson"):
-        conditions.append(
-            """
-            EXISTS (
-                SELECT 1 FROM `tabPOS Profile User` ppu
-                WHERE ppu.parent = si.pos_profile 
-                AND ppu.custom_user_type = 'Salesman'
-                AND ppu.custom_user_name = %(salesperson)s
-            )
-        """
-        )
+    # if filters.get("salesperson"):
+    #     conditions.append(
+    #         """
+    #         EXISTS (
+    #             SELECT 1 FROM `tabPOS Profile User` ppu
+    #             WHERE ppu.parent = si.pos_profile
+    #             AND ppu.custom_user_type = 'Salesman'
+    #             AND ppu.custom_user_name = %(salesperson)s
+    #         )
+    #     """
+    #     )
 
     return " AND " + " AND ".join(conditions) if conditions else ""
