@@ -1,0 +1,49 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2025-11-24 16:46:37.391448",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": "Company Letterhead",
+ "letterhead": null,
+ "modified": "2025-11-24 16:49:07.189556",
+ "modified_by": "Administrator",
+ "module": "tatweersports",
+ "name": "Shtine Sales Man",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Sales Invoice",
+ "report_name": "Shtine Sales Man",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Warehouse User"
+  },
+  {
+   "role": "Salesman"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Employee Self Service"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "CFO"
+  }
+ ],
+ "timeout": 0
+}
