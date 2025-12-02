@@ -9,8 +9,8 @@ def execute(filters=None):
     if not filters:
         filters = {}
 
-    # Base conditions: only submitted, non-return invoices
-    conditions = "si.docstatus = 1 AND IFNULL(si.is_return, 0) = 0"
+    # Base conditions: only submitted, 
+    conditions = "si.docstatus = 1"
     if filters.get("from_date") and filters.get("to_date"):
         conditions += " AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s"
     if filters.get("warehouse"):
