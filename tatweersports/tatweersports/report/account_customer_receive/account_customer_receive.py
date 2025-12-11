@@ -58,12 +58,14 @@ def get_columns():
             "fieldname": "outstanding_amount",
             "fieldtype": "Currency",
             "width": 120,
+            "hidden": True,
         },
         {
             "label": "Credit Amount",
             "fieldname": "credit_amount",
             "fieldtype": "Currency",
             "width": 120,
+            "hidden": 1,
         },
         {
             "label": "Net Outstanding",
