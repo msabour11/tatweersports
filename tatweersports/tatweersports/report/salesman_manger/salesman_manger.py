@@ -215,9 +215,15 @@ def get_data(filters):
             WHERE pe.docstatus = 1
               AND pe.mode_of_payment LIKE '%%cash%%'
             GROUP BY DATE(pe.posting_date), pe.custom_salesman, ppu.custom_user_name, ppu_profile.pos_profile
-        ) AS final
-        WHERE 1=1 {conditions}
-        ORDER BY final.date, final.pos_profile, final.salesperson
+                ) AS final
+                WHERE 1=1 {conditions}
+                    AND (
+                                final.pos_profile IS NULL
+                                OR final.pos_profile IN (
+                                        SELECT name FROM `tabPOS Profile` WHERE disabled = 0
+                                )
+                            )
+                ORDER BY final.date, final.pos_profile, final.salesperson
     """
 
     # Get the unioned data
