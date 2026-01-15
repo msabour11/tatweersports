@@ -10,7 +10,7 @@
  "is_standard": "Yes",
  "letter_head": "Company Letterhead",
  "letterhead": null,
- "modified": "2026-01-13 17:04:06.474991",
+ "modified": "2026-01-15 17:05:47.391643",
  "modified_by": "Administrator",
  "module": "tatweersports",
  "name": "Sales Man Manager  Summary",
@@ -28,6 +28,12 @@
   },
   {
    "role": "Administrator"
+  },
+  {
+   "role": "Report Manager"
+  },
+  {
+   "role": "Stock Manager"
   }
  ],
  "timeout": 0
