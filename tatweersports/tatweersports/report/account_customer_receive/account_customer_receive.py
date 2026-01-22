@@ -1,6 +1,7 @@
 # Copyright (c) 2025, Mohamed AbdElsabour and contributors
 # For license information, please see license.txt
 
+
 import frappe
 from frappe import _
 
@@ -8,9 +9,14 @@ from frappe import _
 def execute(filters=None):
     columns = get_columns()
     data = get_data(filters or {})
-    return columns, data
+    chart = get_chart(data)
+    report_summary = get_report_summary(data)
+    return columns, data, None, chart, report_summary  # 5-element tuple
 
 
+# ------------------------------------------------------------------
+# Columns 
+# ------------------------------------------------------------------
 def get_columns():
     return [
         {
@@ -73,6 +79,9 @@ def get_columns():
     ]
 
 
+# ------------------------------------------------------------------
+# Data 
+# ------------------------------------------------------------------
 def get_data(filters):
     conditions = get_conditions(filters)
 
@@ -117,15 +126,19 @@ def get_data(filters):
 
             LEFT JOIN (
                 SELECT
-                    party AS customer,
-                    SUM(credit_in_account_currency) AS credit_amount
-                FROM `tabGL Entry`
+                    gle.party AS customer,
+                    SUM(gle.credit_in_account_currency) AS credit_amount
+                FROM `tabGL Entry` gle
+                INNER JOIN `tabJournal Entry` je
+                       ON je.name = gle.voucher_no
+                      AND je.docstatus = 1
                 WHERE
-                    party_type = 'Customer'
-                    AND voucher_type = 'Journal Entry'
-                    AND is_cancelled = 0
-                    AND credit_in_account_currency > 0
-                GROUP BY party
+                    gle.party_type = 'Customer'
+                    AND gle.voucher_type = 'Journal Entry'
+                    AND gle.is_cancelled = 0
+                    AND gle.credit_in_account_currency > 0
+                    AND je.is_system_generated = 0
+                GROUP BY gle.party
             ) gle ON gle.customer = si.customer
 
             WHERE
@@ -143,6 +156,72 @@ def get_data(filters):
     return frappe.db.sql(query, filters, as_dict=True)
 
 
+# ------------------------------------------------------------------
+# Chart
+# ------------------------------------------------------------------
+def get_chart(data):
+    """
+    Bar chart:  Net Outstanding per customer
+    """
+    from collections import defaultdict
+
+    customer_totals = defaultdict(float)
+    for row in data:
+        customer_totals[row.customer] += row.net_outstanding
+
+    labels = list(customer_totals.keys())
+    values = list(customer_totals.values())
+
+    return {
+        "data": {
+            "labels": labels,
+            "datasets": [
+                {
+                    "name": _("Net Outstanding"),
+                    "values": values,
+                }
+            ],
+        },
+        "type": "bar",
+        "colors": ["#449CF0"],
+    }
+
+
+# ------------------------------------------------------------------
+# Report Summary (top cards)
+# ------------------------------------------------------------------
+def get_report_summary(data):
+    invoiced = sum(float(row.invoiced_amount) for row in data)
+    paid = sum(float(row.paid_amount) for row in data)
+    net_outstanding = sum(float(row.net_outstanding) for row in data)
+
+    currency = frappe.defaults.get_global_default("currency") or "USD"
+
+    return [
+        {
+            "value": invoiced,
+            "label": _("Total Invoiced Amount"),
+            "datatype": "Currency",
+            "currency": currency,
+        },
+        {
+            "value": paid,
+            "label": _("Total Paid Amount"),
+            "datatype": "Currency",
+            "currency": currency,
+        },
+        {
+            "value": net_outstanding,
+            "label": _("Total Net Outstanding"),
+            "datatype": "Currency",
+            "currency": currency,
+        },
+    ]
+
+
+# ------------------------------------------------------------------
+# Filter conditions 
+# ------------------------------------------------------------------
 def get_conditions(filters):
     conditions = []
 

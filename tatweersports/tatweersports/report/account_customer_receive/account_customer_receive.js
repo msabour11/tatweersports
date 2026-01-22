@@ -2,6 +2,18 @@
 // For license information, please see license.txt
 
 frappe.query_reports["Account Customer Receive"] = {
+  onload: function (report) {
+    // Add print-specific CSS
+    const style = document.createElement("style");
+    style.innerHTML = `
+            @media print {
+                .dt-cell--col-6 { /* Column index 6 is Outstanding Amount (0-indexed) */
+                    display: none !important;
+                }
+            }
+        `;
+    document.head.appendChild(style);
+  },
   filters: [
     {
       fieldname: "from_date",
