@@ -150,7 +150,7 @@ def get_data(filters):
             a.available_for_use_date,
             a.status
         FROM `tabAsset` a
-        WHERE {conditions}
+        WHERE {conditions} and a.docstatus = 1
         ORDER BY a.purchase_date DESC
     """
 
