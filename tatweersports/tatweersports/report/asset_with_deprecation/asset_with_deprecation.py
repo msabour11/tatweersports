@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Mohamed AbdElsabour and contributors
 # For license information, please see license.txt
 
+
 # import frappe
 
 
@@ -69,6 +70,18 @@
 #             "width": 160,
 #         },
 #         {
+#             "label": "Net Book Value",
+#             "fieldname": "net_book_value",
+#             "fieldtype": "Currency",
+#             "width": 150,
+#         },
+#         {
+#             "label": "Last Depreciation Posting",
+#             "fieldname": "last_depreciation_posting",
+#             "fieldtype": "Date",
+#             "width": 150,
+#         },
+#         {
 #             "label": "Purchase Date",
 #             "fieldname": "purchase_date",
 #             "fieldtype": "Date",
@@ -108,11 +121,11 @@
 #         conditions += " AND a.item_code = %(item_code)s"
 #         params["item_code"] = filters["item_code"]
 
-#     if filters.get("is_existing_asset") and filters["is_existing_asset"] in ("0", "1"):
+#     if filters.get("is_existing_asset") in ("0", "1"):
 #         conditions += " AND a.is_existing_asset = %(is_existing_asset)s"
 #         params["is_existing_asset"] = int(filters["is_existing_asset"])
 
-#     # depreciation cutoff date
+#     # FIXED: remove HTML entity &lt;=
 #     dep_date_cond = ""
 #     if filters.get("depreciation_upto_date"):
 #         dep_date_cond = " AND gle.posting_date <= %(depreciation_upto_date)s"
@@ -127,6 +140,7 @@
 #             a.location,
 #             IF(a.is_existing_asset = 1, 'Yes', 'No') AS is_existing_asset,
 #             a.gross_purchase_amount AS purchase_amount,
+
 #             (
 #                 SELECT COALESCE(SUM(gle.credit - gle.debit), 0)
 #                 FROM `tabGL Entry` gle
@@ -134,11 +148,9 @@
 #                 WHERE gle.company = a.company
 #                   AND gle.voucher_type = 'Journal Entry'
 #                   AND gle.is_cancelled = 0
-#                   -- correctly linked to asset
 #                   AND (
 #                         (gle.against_voucher_type = 'Asset' AND gle.against_voucher = a.name)
 #                   )
-#                   -- only accumulated depreciation accounts
 #                   AND (
 #                         acc.account_type = 'Accumulated Depreciation'
 #                         OR acc.account_name LIKE '%%Accumulated Depreciation%%'
@@ -146,18 +158,59 @@
 #                   )
 #                   {dep_date_cond}
 #             ) AS total_depreciation,
+
+#             (
+#                 a.gross_purchase_amount -
+#                 (
+#                     SELECT COALESCE(SUM(gle.credit - gle.debit), 0)
+#                     FROM `tabGL Entry` gle
+#                     LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+#                     WHERE gle.company = a.company
+#                       AND gle.voucher_type = 'Journal Entry'
+#                       AND gle.is_cancelled = 0
+#                       AND (
+#                              (gle.against_voucher_type = 'Asset' AND gle.against_voucher = a.name)
+#                       )
+#                       AND (
+#                             acc.account_type = 'Accumulated Depreciation'
+#                             OR acc.account_name LIKE '%%Accumulated Depreciation%%'
+#                             OR gle.account LIKE '%%Accumulated Depreciation%%'
+#                       )
+#                       {dep_date_cond}
+#                 )
+#             ) AS net_book_value,
+
+#             (
+#                 SELECT MAX(gle.posting_date)
+#                 FROM `tabGL Entry` gle
+#                 LEFT JOIN `tabAccount` acc ON acc.name = gle.account
+#                 WHERE gle.company = a.company
+#                   AND gle.voucher_type = 'Journal Entry'
+#                   AND gle.is_cancelled = 0
+#                   AND (
+
+#                         (gle.against_voucher_type = 'Asset' AND gle.against_voucher = a.name)
+#                   )
+#                   AND (
+#                         acc.account_type = 'Accumulated Depreciation'
+#                         OR acc.account_name LIKE '%%Accumulated Depreciation%%'
+#                         OR gle.account LIKE '%%Accumulated Depreciation%%'
+#                   )
+#             ) AS last_depreciation_posting,
+
 #             a.purchase_date,
 #             a.available_for_use_date,
 #             a.status
+
 #         FROM `tabAsset` a
-#         WHERE {conditions} and a.docstatus = 1
+#         WHERE {conditions} AND docstatus = 1
 #         ORDER BY a.purchase_date DESC
 #     """
 
 #     return frappe.db.sql(sql, params, as_dict=True)
 
 
-#################################
+#####################################3
 import frappe
 
 
@@ -254,38 +307,45 @@ def get_columns():
 
 
 def get_data(filters):
-    conditions = "1=1"
+    conditions = ["a.docstatus = 1"]
     params = {}
 
+    # --- Standard asset filters ---
     if filters.get("company"):
-        conditions += " AND a.company = %(company)s"
+        conditions.append("a.company = %(company)s")
         params["company"] = filters["company"]
 
     if filters.get("asset_name"):
-        conditions += " AND a.name = %(asset_name)s"
+        conditions.append("a.name = %(asset_name)s")
         params["asset_name"] = filters["asset_name"]
 
     if filters.get("asset_category"):
-        conditions += " AND a.asset_category = %(asset_category)s"
+        conditions.append("a.asset_category = %(asset_category)s")
         params["asset_category"] = filters["asset_category"]
 
     if filters.get("location"):
-        conditions += " AND a.location = %(location)s"
+        conditions.append("a.location = %(location)s")
         params["location"] = filters["location"]
 
     if filters.get("item_code"):
-        conditions += " AND a.item_code = %(item_code)s"
+        conditions.append("a.item_code = %(item_code)s")
         params["item_code"] = filters["item_code"]
 
-    if filters.get("is_existing_asset") in ("0", "1"):
-        conditions += " AND a.is_existing_asset = %(is_existing_asset)s"
+    if filters.get("is_existing_asset") in ("0", "1", 0, 1):
+        conditions.append("a.is_existing_asset = %(is_existing_asset)s")
         params["is_existing_asset"] = int(filters["is_existing_asset"])
 
-    # FIXED: remove HTML entity &lt;=
+    # --- Single cutoff filter used in two places ---
     dep_date_cond = ""
     if filters.get("depreciation_upto_date"):
+        # Apply to GL subqueries
         dep_date_cond = " AND gle.posting_date <= %(depreciation_upto_date)s"
         params["depreciation_upto_date"] = filters["depreciation_upto_date"]
+
+        # Apply to asset selection (purchase date <= cutoff)
+        conditions.append("a.purchase_date <= %(depreciation_upto_date)s")
+
+    where_clause = " AND ".join(conditions)
 
     sql = f"""
         SELECT
@@ -297,6 +357,7 @@ def get_data(filters):
             IF(a.is_existing_asset = 1, 'Yes', 'No') AS is_existing_asset,
             a.gross_purchase_amount AS purchase_amount,
 
+            -- Total depreciation booked up to cutoff (GL posting_date)
             (
                 SELECT COALESCE(SUM(gle.credit - gle.debit), 0)
                 FROM `tabGL Entry` gle
@@ -304,9 +365,8 @@ def get_data(filters):
                 WHERE gle.company = a.company
                   AND gle.voucher_type = 'Journal Entry'
                   AND gle.is_cancelled = 0
-                  AND (
-                        (gle.against_voucher_type = 'Asset' AND gle.against_voucher = a.name)
-                  )
+                  AND gle.against_voucher_type = 'Asset'
+                  AND gle.against_voucher = a.name
                   AND (
                         acc.account_type = 'Accumulated Depreciation'
                         OR acc.account_name LIKE '%%Accumulated Depreciation%%'
@@ -315,6 +375,7 @@ def get_data(filters):
                   {dep_date_cond}
             ) AS total_depreciation,
 
+            -- NBV = Purchase Amount - Total Depreciation (same cutoff)
             (
                 a.gross_purchase_amount -
                 (
@@ -324,9 +385,8 @@ def get_data(filters):
                     WHERE gle.company = a.company
                       AND gle.voucher_type = 'Journal Entry'
                       AND gle.is_cancelled = 0
-                      AND (
-                             (gle.against_voucher_type = 'Asset' AND gle.against_voucher = a.name)
-                      )
+                      AND gle.against_voucher_type = 'Asset'
+                      AND gle.against_voucher = a.name
                       AND (
                             acc.account_type = 'Accumulated Depreciation'
                             OR acc.account_name LIKE '%%Accumulated Depreciation%%'
@@ -336,6 +396,7 @@ def get_data(filters):
                 )
             ) AS net_book_value,
 
+            -- Last depreciation posting date (overall)
             (
                 SELECT MAX(gle.posting_date)
                 FROM `tabGL Entry` gle
@@ -343,10 +404,8 @@ def get_data(filters):
                 WHERE gle.company = a.company
                   AND gle.voucher_type = 'Journal Entry'
                   AND gle.is_cancelled = 0
-                  AND (
-
-                        (gle.against_voucher_type = 'Asset' AND gle.against_voucher = a.name)
-                  )
+                  AND gle.against_voucher_type = 'Asset'
+                  AND gle.against_voucher = a.name
                   AND (
                         acc.account_type = 'Accumulated Depreciation'
                         OR acc.account_name LIKE '%%Accumulated Depreciation%%'
@@ -359,7 +418,7 @@ def get_data(filters):
             a.status
 
         FROM `tabAsset` a
-        WHERE {conditions} AND docstatus = 1
+        WHERE {where_clause}
         ORDER BY a.purchase_date DESC
     """
 
