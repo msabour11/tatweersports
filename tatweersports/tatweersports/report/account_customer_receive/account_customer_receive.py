@@ -1,6 +1,246 @@
-# Copyright (c) 2025, Mohamed AbdElsabour and contributors
-# For license information, please see license.txt
+# # Copyright (c) 2025, Mohamed AbdElsabour and contributors
+# # For license information, please see license.txt
 
+
+# import frappe
+# from frappe import _
+
+
+# def execute(filters=None):
+#     columns = get_columns()
+#     data = get_data(filters or {})
+#     chart = get_chart(data)
+#     report_summary = get_report_summary(data)
+#     return columns, data, None, chart, report_summary  # 5-element tuple
+
+
+# # ------------------------------------------------------------------
+# # Columns
+# # ------------------------------------------------------------------
+# def get_columns():
+#     return [
+#         {
+#             "label": _("Posting Date"),
+#             "fieldname": "posting_date",
+#             "fieldtype": "Date",
+#             "width": 120,
+#         },
+#         {
+#             "label": _("Customer"),
+#             "fieldname": "customer",
+#             "fieldtype": "Link",
+#             "options": "Customer",
+#             "width": 200,
+#         },
+#         {
+#             "label": _("Sales Person"),
+#             "fieldname": "sales_person",
+#             "fieldtype": "Link",
+#             "options": "Sales Person",
+#             "width": 160,
+#         },
+#         {
+#             "label": _("Invoice No"),
+#             "fieldname": "invoice_no",
+#             "fieldtype": "Link",
+#             "options": "Sales Invoice",
+#             "width": 180,
+#         },
+#         {
+#             "label": _("Invoiced Amount"),
+#             "fieldname": "invoiced_amount",
+#             "fieldtype": "Currency",
+#             "width": 120,
+#         },
+#         {
+#             "label": _("Paid Amount"),
+#             "fieldname": "paid_amount",
+#             "fieldtype": "Currency",
+#             "width": 120,
+#         },
+#         {
+#             "label": _("Outstanding Amount"),
+#             "fieldname": "outstanding_amount",
+#             "fieldtype": "Currency",
+#             "width": 130,
+#         },
+#         {
+#             "label": _("Credit Amount"),
+#             "fieldname": "credit_amount",
+#             "fieldtype": "Currency",
+#             "width": 120,
+#         },
+#         {
+#             "label": _("Net Outstanding"),
+#             "fieldname": "net_outstanding",
+#             "fieldtype": "Currency",
+#             "width": 140,
+#         },
+#     ]
+
+
+# # ------------------------------------------------------------------
+# # Data
+# # ------------------------------------------------------------------
+# def get_data(filters):
+#     conditions = get_conditions(filters)
+
+#     query = f"""
+#         SELECT
+#             s.posting_date,
+#             s.customer,
+#             s.sales_person,
+#             s.invoice_no,
+#             s.invoiced_amount,
+#             s.paid_amount,
+#             s.outstanding_amount,
+
+#             CASE
+#                 WHEN s.rn = 1 THEN COALESCE(s.credit_amount, 0)
+#                 ELSE 0
+#             END AS credit_amount,
+
+#             s.outstanding_amount -
+#             CASE
+#                 WHEN s.rn = 1 THEN COALESCE(s.credit_amount, 0)
+#                 ELSE 0
+#             END AS net_outstanding
+
+#         FROM (
+#             SELECT
+#                 si.posting_date,
+#                 si.customer,
+#                 si.sales_person,
+#                 si.name AS invoice_no,
+#                 si.grand_total AS invoiced_amount,
+#                 (si.grand_total - si.outstanding_amount) AS paid_amount,
+#                 si.outstanding_amount,
+#                 gle.credit_amount,
+
+#                 ROW_NUMBER() OVER (
+#                     PARTITION BY si.customer
+#                     ORDER BY si.posting_date DESC
+#                 ) AS rn
+
+#             FROM `tabSales Invoice` si
+
+#             LEFT JOIN (
+#                 SELECT
+#                     gle.party AS customer,
+#                     SUM(gle.credit_in_account_currency) AS credit_amount
+#                 FROM `tabGL Entry` gle
+#                 INNER JOIN `tabJournal Entry` je
+#                        ON je.name = gle.voucher_no
+#                       AND je.docstatus = 1
+#                 WHERE
+#                     gle.party_type = 'Customer'
+#                     AND gle.voucher_type = 'Journal Entry'
+#                     AND gle.is_cancelled = 0
+#                     AND gle.credit_in_account_currency > 0
+#                     AND je.is_system_generated = 0
+#                 GROUP BY gle.party
+#             ) gle ON gle.customer = si.customer
+
+#             WHERE
+#                 si.docstatus = 1
+#                 AND si.is_return = 0
+#                 AND si.outstanding_amount > 0
+#                 {conditions}
+#         ) s
+
+#         ORDER BY
+#             s.customer,
+#             s.posting_date DESC
+#     """
+
+#     return frappe.db.sql(query, filters, as_dict=True)
+
+
+# # ------------------------------------------------------------------
+# # Chart
+# # ------------------------------------------------------------------
+# def get_chart(data):
+#     """
+#     Bar chart:  Net Outstanding per customer
+#     """
+#     from collections import defaultdict
+
+#     customer_totals = defaultdict(float)
+#     for row in data:
+#         customer_totals[row.customer] += row.net_outstanding
+
+#     labels = list(customer_totals.keys())
+#     values = list(customer_totals.values())
+
+#     return {
+#         "data": {
+#             "labels": labels,
+#             "datasets": [
+#                 {
+#                     "name": _("Net Outstanding"),
+#                     "values": values,
+#                 }
+#             ],
+#         },
+#         "type": "bar",
+#         "colors": ["#449CF0"],
+#     }
+
+
+# # ------------------------------------------------------------------
+# # Report Summary (top cards)
+# # ------------------------------------------------------------------
+# def get_report_summary(data):
+#     invoiced = sum(float(row.invoiced_amount) for row in data)
+#     paid = sum(float(row.paid_amount) for row in data)
+#     net_outstanding = sum(float(row.net_outstanding) for row in data)
+
+#     currency = frappe.defaults.get_global_default("currency") or "USD"
+
+#     return [
+#         {
+#             "value": invoiced,
+#             "label": _("Total Invoiced Amount"),
+#             "datatype": "Currency",
+#             "currency": currency,
+#         },
+#         {
+#             "value": paid,
+#             "label": _("Total Paid Amount"),
+#             "datatype": "Currency",
+#             "currency": currency,
+#         },
+#         {
+#             "value": net_outstanding,
+#             "label": _("Total Net Outstanding"),
+#             "datatype": "Currency",
+#             "currency": currency,
+#         },
+#     ]
+
+
+# # ------------------------------------------------------------------
+# # Filter conditions
+# # ------------------------------------------------------------------
+# def get_conditions(filters):
+#     conditions = []
+
+#     if filters.get("from_date"):
+#         conditions.append("si.posting_date >= %(from_date)s")
+
+#     if filters.get("to_date"):
+#         conditions.append("si.posting_date <= %(to_date)s")
+
+#     if filters.get("customer"):
+#         conditions.append("si.customer = %(customer)s")
+
+#     if filters.get("sales_person"):
+#         conditions.append("si.sales_person = %(sales_person)s")
+
+#     return " AND " + " AND ".join(conditions) if conditions else ""
+
+
+##############fix debit
 
 import frappe
 from frappe import _
@@ -15,7 +255,7 @@ def execute(filters=None):
 
 
 # ------------------------------------------------------------------
-# Columns 
+# Columns
 # ------------------------------------------------------------------
 def get_columns():
     return [
@@ -65,10 +305,10 @@ def get_columns():
             "width": 130,
         },
         {
-            "label": _("Credit Amount"),
+            "label": _("Credit Amount (JE)"),
             "fieldname": "credit_amount",
             "fieldtype": "Currency",
-            "width": 120,
+            "width": 140,
         },
         {
             "label": _("Net Outstanding"),
@@ -80,77 +320,52 @@ def get_columns():
 
 
 # ------------------------------------------------------------------
-# Data 
+# Data
 # ------------------------------------------------------------------
 def get_data(filters):
     conditions = get_conditions(filters)
 
     query = f"""
         SELECT
-            s.posting_date,
-            s.customer,
-            s.sales_person,
-            s.invoice_no,
-            s.invoiced_amount,
-            s.paid_amount,
-            s.outstanding_amount,
+            si.posting_date,
+            si.customer,
+            si.sales_person,
+            si.name AS invoice_no,
+            si.grand_total AS invoiced_amount,
+            (si.grand_total - si.outstanding_amount) AS paid_amount,
+            si.outstanding_amount,
+            COALESCE(gle.total_credit, 0) AS credit_amount,
+            (si.outstanding_amount - COALESCE(gle.total_credit, 0)) AS net_outstanding
 
-            CASE
-                WHEN s.rn = 1 THEN COALESCE(s.credit_amount, 0)
-                ELSE 0
-            END AS credit_amount,
+        FROM `tabSales Invoice` si
 
-            s.outstanding_amount -
-            CASE
-                WHEN s.rn = 1 THEN COALESCE(s.credit_amount, 0)
-                ELSE 0
-            END AS net_outstanding
+        LEFT JOIN (
+            SELECT 
+                gle.against_voucher AS invoice_no,
+                SUM(gle.credit_in_account_currency) AS total_credit
+            FROM `tabGL Entry` gle
+            INNER JOIN `tabJournal Entry` je 
+                ON je.name = gle.voucher_no 
+                AND je.docstatus = 1
+            WHERE 
+                gle.party_type = 'Customer'
+                AND gle.voucher_type = 'Journal Entry'
+                AND gle.against_voucher_type = 'Sales Invoice'
+                AND gle.is_cancelled = 0
+                AND gle.credit_in_account_currency > 0
+                AND je.is_system_generated = 0
+            GROUP BY gle.against_voucher
+        ) gle ON gle.invoice_no = si.name
 
-        FROM (
-            SELECT
-                si.posting_date,
-                si.customer,
-                si.sales_person,
-                si.name AS invoice_no,
-                si.grand_total AS invoiced_amount,
-                (si.grand_total - si.outstanding_amount) AS paid_amount,
-                si.outstanding_amount,
-                gle.credit_amount,
-
-                ROW_NUMBER() OVER (
-                    PARTITION BY si.customer
-                    ORDER BY si.posting_date DESC
-                ) AS rn
-
-            FROM `tabSales Invoice` si
-
-            LEFT JOIN (
-                SELECT
-                    gle.party AS customer,
-                    SUM(gle.credit_in_account_currency) AS credit_amount
-                FROM `tabGL Entry` gle
-                INNER JOIN `tabJournal Entry` je
-                       ON je.name = gle.voucher_no
-                      AND je.docstatus = 1
-                WHERE
-                    gle.party_type = 'Customer'
-                    AND gle.voucher_type = 'Journal Entry'
-                    AND gle.is_cancelled = 0
-                    AND gle.credit_in_account_currency > 0
-                    AND je.is_system_generated = 0
-                GROUP BY gle.party
-            ) gle ON gle.customer = si.customer
-
-            WHERE
-                si.docstatus = 1
-                AND si.is_return = 0
-                AND si.outstanding_amount > 0
-                {conditions}
-        ) s
+        WHERE
+            si.docstatus = 1
+            AND si.is_return = 0
+            AND si.outstanding_amount > 0
+            {conditions}
 
         ORDER BY
-            s.customer,
-            s.posting_date DESC
+            si.customer,
+            si.posting_date DESC
     """
 
     return frappe.db.sql(query, filters, as_dict=True)
@@ -161,7 +376,7 @@ def get_data(filters):
 # ------------------------------------------------------------------
 def get_chart(data):
     """
-    Bar chart:  Net Outstanding per customer
+    Bar chart: Net Outstanding per customer
     """
     from collections import defaultdict
 
@@ -188,7 +403,7 @@ def get_chart(data):
 
 
 # ------------------------------------------------------------------
-# Report Summary (top cards)
+# Report Summary 
 # ------------------------------------------------------------------
 def get_report_summary(data):
     invoiced = sum(float(row.invoiced_amount) for row in data)
@@ -220,7 +435,7 @@ def get_report_summary(data):
 
 
 # ------------------------------------------------------------------
-# Filter conditions 
+# Filter conditions
 # ------------------------------------------------------------------
 def get_conditions(filters):
     conditions = []
